@@ -1,0 +1,90 @@
+Ruby.scala is a simple parser written in the language Scala by using 
+parser combinators for ISO Ruby, ISO/IEC 30170:2012. It is written by 
+Dr. Ikuo Nakata, the chairman of the working group for the standardization 
+of the language Ruby, with the help by Dr. Kota Mizushima, a deputation of 
+Japan Scala Users Group and working at Ubiregi Inc.
+
+Ruby.scala directly follows the syntax of ISO Ruby, except the following:
+
+1. The left recursions are eliminated.
+
+2. A local-variable-identifier which begins with the letter 'm' is 
+ considered as a method name. Any other local-variable-identifiers are 
+ considered as local variable names.
+
+3. The nested brackets in an array-literal are not permitted.
+
+4. The production rules for multiple-right-hand-side, class-definition,
+ method-definition and singleton-method-definition are corrected as follows:
+
+ 11.4.2.4
+ multiple-right-hand-side :: 
+   operator-expression-list [no line-terminator here] , splatting-right-hand-side 
+ | operator-expression [no line-terminator here] , operator-expression-list
+ | splatting-right-hand-side
+
+ 13.2.2
+ class-definition :: 
+   class class-path ( [no line-terminator here] < superclass )? 
+     separator class-body end 
+
+ 13.3.1
+ method-definition :: 
+   def defined-method-name 
+     ( [no line-terminator here] method-parameter-part | separator )
+     method-body end
+
+ 13.4.3
+ singleton-method-definition :: 
+   def singleton-object ( . | :: ) defined-method-name 
+     ( [no line-terminator here] method-parameter-part | separator )
+     method-body end
+
+Usage:
+
+  $ scalac Ruby.scala
+
+  $ scala -cp . RubyParser test.rb
+
+Example 1:
+ ------ test.rb --------
+ class X 
+   @@a = 'abc' 
+   def mprint_a 
+     mputs @@a 
+   end 
+   def mset_a(value) 
+     @@a = value 
+   end 
+ end
+ -----------------------
+
+ ------- output --------
+ class X 
+ var-assign-ex(@@a='abc')
+ def mprint_a;
+ method-inv-without-par(command(mputs @@a)) end-def
+ def mset_a(value)
+ var-assign-ex(@@a=value) end-def
+ end-class
+ ----------------------
+
+Example 2:
+ ------ test.rb --------
+<<ABC + <<XXX
+efg
+ABC
+pqr
+XXX
+----------------------
+
+------- output --------
+(Heredoc("efg
+") + Heredoc("pqr
+"))
+----------------------
+
+The output is customizable by modifying each Parser object
+corresponding to a production rule.
+The current output is a string, and the string can be easily modified 
+by changing the output strings of relevant Parser objects.
