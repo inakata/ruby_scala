@@ -21,5 +21,5 @@ publishMavenStyle := true
 scalacOptions ++= Seq("-deprecation","-unchecked")
  
 initialCommands in console += {
-  Iterator("jp.scala_users.org.ruby_scala._").map("import "+).mkString("\n")
+  Iterator("org.scala_users.jp.ruby_scala._").map("import "+).mkString("\n")
 }
