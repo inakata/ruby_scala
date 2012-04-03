@@ -1,4 +1,4 @@
-package jp.scala_users.org.ruby_scala
+package org.scala_users.jp.ruby_scala
 
 import scala.util.parsing.combinator._
 import scala.util.parsing.input._
