@@ -40,6 +40,12 @@ Ruby.scala directly follows the syntax of ISO Ruby, except the following:
      ( [no line-terminator here] method-parameter-part | separator )
      method-body end
 
+5. "method-identifier block" in the right hand of production of primary-method-
+ invocation (11.3.1) is changed to "method-identifier block?".
+
+6. Expressions which end with a do-block are not permitted as the expression in 
+ while-expression, until-expression or for-expression.
+
 Usage:
 
   $ scalac Ruby.scala
