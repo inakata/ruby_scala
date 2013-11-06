@@ -1323,7 +1323,9 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
              QuotedExpandedArrayConstructor
   lazy val QuotedNonExpandedArrayConstructor: Parser[String] =
              regex("""%w""".r) ~ ( LiteralBeginningDelimiter >> { case literalBegin =>
-                 NonExpandedArrayContent(literalBegin) ~ LiteralEndingDelimiter2(literalBegin) ^^ {  case a~e => "'" + literalBegin + "'" + a+ "'" + e + "'" }
+               (NonExpandedArrayContent(literalBegin) >> {case content =>
+                 Parser{next => Success(content.split(" ").mkString("__"), next)}
+               }) ~ (LiteralEndingDelimiter2(literalBegin)) ^^ {  case a~e => "'" + literalBegin + "'" + a+ "'" + e + "'" }
              } ) ^^ { case r~s => s"|${r}|" + s }
   def NonExpandedArrayContent(literalBegin: String): Parser[String] =
              ??(QuotedArrayItemSeparatorList) ~ ??(NonExpandedArrayItemList(literalBegin)) ~
