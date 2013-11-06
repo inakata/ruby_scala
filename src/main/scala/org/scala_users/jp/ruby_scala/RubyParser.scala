@@ -3,7 +3,8 @@ package org.scala_users.jp.ruby_scala
 import java.io.FileReader
 object RubyParser extends Ruby {
   def main(args: Array[String]) {
-    val reader = new FileReader(args(0))
+    val reader = new java.io.StringReader("%w[a b c]")
+    //val reader = new FileReader(args(0))
     println(parseAll(program, reader))
   }
 }
