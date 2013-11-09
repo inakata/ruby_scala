@@ -1,0 +1,11 @@
+target
+lib_managed
+src_managed
+project/boot
+project/plugins/project
+.project
+.classpath
+.cache
+.settings/
+.idea
+.idea_modules
