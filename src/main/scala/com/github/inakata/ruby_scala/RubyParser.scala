@@ -1,4 +1,4 @@
-package org.scala_users.jp.ruby_scala
+package com.github.inakata.ruby_scala
 
 import java.io.FileReader
 object RubyParser extends Ruby {
