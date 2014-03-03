@@ -1,5 +1,4 @@
 package com.github.inakata.ruby_scala
-
 import scala.util.parsing.combinator._
 import scala.util.parsing.input._
 
@@ -153,12 +152,16 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
 
   lazy val program: Parser[Any] =
              compoundStatement
+
   lazy val compoundStatement: Parser[String] =
              memo(??(statementList) <~ ??(separatorList))
+
   lazy val statementList: Parser[String] =
              memo(rep1sep(statement, separatorList) ^^ { (_).mkString("", "\n", "") } )
+
   lazy val separatorList: Parser[String] =
              ( separator+ ) ^^ { case e => ";" }
+
   lazy val separator: Parser[String] =
              LineTerminator |
              SEMICOLON
@@ -169,6 +172,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
   lazy val expression: Parser[String] = // notExpression | keywordAndExpression | keywordOrExpression
              memo(chainl1 ( notExpression, not(LineTerminator) ~ (AND | OR) ^^ {
                             case n~op => (l: String, r: String) => "("+ l+" "+op+" "+r +")" } ))
+
   lazy val notExpression: Parser[String] = memo(
              keywordNotExpression |
              NotOP ~ methodInvocationWithoutParentheses ^^ {case n~m => "!" + m } |
@@ -198,17 +202,21 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
              MethodIdentifier ~ block ^^ { case m~b => m + b } |
              MethodIdentifier ~ not(WS) ~ argumentWithParentheses ~ ??(block) ^^ {
                              case m~n~a~b => m + a + b } )
+
   lazy val MethodIdentifier: Parser[String] =
              MethodID |
              ConstantIdentifier |
              MethodOnlyIdentifier // not LocalVariableIdentifier
+
   lazy val methodName: Parser[String] =
              OperatorMethodName |
              MethodIdentifier |
              Keyword
+
 // lazy val indexing-method-invocation // in primaryExpression
   lazy val methodNameExceptConstant: Parser[String] =
              not(ConstID) ~ methodName ^^ { case n~m => m }
+
   lazy val methodInvocationWithoutParentheses: Parser[String] = memo(
              command ^^ { case c => "method-inv-without-par("+c+")" } |
              chainedCommandWithDoBlock ~ (PERIOD | DoubleCOLON) ~ methodName ~ argumentWithoutParentheses ^^ {
@@ -217,6 +225,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
              returnWithArgument |
              breakWithArgument |
              nextWithArgument )
+
   lazy val command: Parser[String] = memo(
              superWithArgument |
              yieldWithArgument |
@@ -224,10 +233,13 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
                               case m~n~a => "command("+m+" "+a+")" } |  //
              primaryExpression ~ not(LineTerminator) ~ (PERIOD | DoubleCOLON) ~ methodName ~ not(not(WS) ~ LPAREN) ~
                  argumentWithoutParentheses ^^ { case p~n1~c~m~n2~a => "command("+p+c+m+" "+a+")" } )
+
   lazy val chainedCommandWithDoBlock: Parser[String] = memo(
              r1chain ( commandWithDoBlock, chainedMethodInvocation )  { case (x, y) => "chained(" + x + y + ")" } )
+
   lazy val chainedMethodInvocation: Parser[String] =
              (PERIOD | DoubleCOLON) ~ methodName ~ ??(argumentWithParentheses) ^^ { case p~m~a => p+m+a }
+
   lazy val commandWithDoBlock: Parser[String] =
              primaryExpression ~ not(LineTerminator) ~ (PERIOD | DoubleCOLON) ~ methodName ~
                  argumentWithoutParentheses ~ doBlock ^^ { case p~n~c~m~a~d => "command-do("+p+c+m+" "+a+" "+d+")" } |
@@ -245,19 +257,25 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
                               case o~c => o+c } |
              associationList ~ ??( not(LineTerminator) ~ COMMA ^^ { case n~c => ", " } ) ^^ { case a~c => a+c } |
              splattingArgument
+
   lazy val splattingArgument: Parser[String] =
              STAR ~ operatorExpression ^^ { case s~o => "*"+o }
+
   lazy val operatorExpressionList: Parser[String] = memo(
              rep1sep(operatorExpression, not(LineTerminator) ~ COMMA) ^^ { (_).mkString("", ", ", "")  }  )
+
   lazy val argumentWithParentheses: Parser[String] = not(WS) ~ parenthesesAndArgument ^^ { case n~p => p }
+
   lazy val parenthesesAndArgument: Parser[String] =
              LPAREN ~ RPAREN ^^ { case l~r => "( )" } |
              LPAREN ~ argumentList ~ RPAREN ^^ { case l~a~r => "("+a+")" } |
              LPAREN ~ operatorExpressionList ~ not(LineTerminator) ~ COMMA ~ chainedCommandWithDoBlock ~ RPAREN ^^ {
                                case l~o~n~c~b~r => "("+o+","+b+")" } |
              LPAREN ~ chainedCommandWithDoBlock ~ RPAREN ^^ { case l~b~r => "("+b+")" }
+
   lazy val argumentWithoutParentheses: Parser[String] =
              not(LBRACE) ~ not(LineTerminator) ~ argumentList ^^ { case n1~n2~a => a }
+
   lazy val argumentList: Parser[String] =
              command |
            blockArgument |
@@ -270,25 +288,29 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
               ??( not(LineTerminator) ~ COMMA ~ splattingArgument ^^ { case n~c~s => ", "+s }) ~
               ??( not(LineTerminator) ~ COMMA ~ blockArgument ^^ { case n~c~b => ", "+b } )  ^^ {
                                case oa~s~a => oa+s+a }
+
   lazy val blockArgument: Parser[String] =
              AMPERSAND ~ operatorExpression ^^ { case a~o => "&"+o }
 
 // 11.3.3 Blocks
 
-  lazy val block: Parser[String] = memo(
-             braceBlock |
-             doBlock )
+  lazy val block: Parser[String] = memo( braceBlock | doBlock )
+
   lazy val braceBlock: Parser[String] =
              LBRACE ~ ??(blockParameter) ~ blockBody ~ RBRACE ^^ { case l~p~b~r => "{"+p+b+"}" }
+
   lazy val doBlock: Parser[String] =
              DO ~ ??(blockParameter) ~ blockBody ~ END ^^ { case d~p~b~e => " do "+p+b+" end" }
+
   lazy val blockParameter: Parser[String] =
              VerticalBAR ~ VerticalBAR ^^ { case v1~v2 => "| | " } |
              OrOP |
              VerticalBAR ~ blockParameterList ~ VerticalBAR ^^ { case v1~b~v2 => "|"+b+"| " }
+
   lazy val blockParameterList: Parser[String] =
              leftHandSide |
              multipleLeftHandSide
+
   lazy val blockBody: Parser[String] =
              compoundStatement
 
@@ -297,8 +319,10 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
   lazy val superWithOptionalArgument: Parser[String] =
              SUPER ~ ??(not(WS) ~ argumentWithoutParentheses ^^ { case n~a => a } ) ~
                  ??(block) ^^ { case s~a~b => "(super "+a+b+")" }
+
   lazy val superWithArgument: Parser[String] =
              SUPER ~ argumentWithoutParentheses ^^ { case s~a => "(super "+a+")" }
+
   lazy val superWithArgumentAndDoBlock: Parser[String] =
              SUPER ~ argumentWithoutParentheses ~ doBlock ^^ { case s~a~b => "(super "+a+b+")" }
 
@@ -308,10 +332,13 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
              yieldWithParenthesesAndArgument |
              yieldWithParenthesesWithoutArgument |
              YIELD
+
   lazy val yieldWithParenthesesAndArgument: Parser[String] =
              YIELD ~ not(WS) ~ LPAREN ~ argumentList ~ RPAREN ^^ { case y~n~l~a~r => "yield ("+a+")" }
+
   lazy val yieldWithParenthesesWithoutArgument: Parser[String] =
              YIELD ~ not(WS) ~ LPAREN ~ RPAREN ^^ { case y~n~l~r => "yield ( )" }
+
   lazy val yieldWithArgument: Parser[String] =
              YIELD ~ argumentWithoutParentheses ^^ { case y~a => "(yield "+a+")" }
 
@@ -329,6 +356,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
              singleAssignmentExpression |
              abbreviatedAssignmentExpression |
              assignmentWithRescueModifier
+
   lazy val assignmentStatement: Parser[String] =
              singleAssignmentStatement |
              abbreviatedAssignmentStatement |
@@ -341,6 +369,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
              scopedConstantAssignmentExpression |
              singleIndexingAssignmentExpression |
              singleMethodAssignmentExpression
+
   lazy val singleAssignmentStatement: Parser[String] =
              singleVariableAssignmentStatement |
              scopedConstantAssignmentStatement |
@@ -352,6 +381,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
   lazy val singleVariableAssignmentStatement: Parser[String] =
              variable ~ not(LineTerminator) ~ EQUAL ~ methodInvocationWithoutParentheses ^^ {
                            case v~n~e~m => "single-variable-st("+v+"="+m+")" }
+
   lazy val singleVariableAssignmentExpression: Parser[String] =
              variable ~ not(LineTerminator) ~ EQUAL ~ operatorExpression ^^ {
                            case v~n~e~o => "single-variable-ex("+v+"="+o+")" }
@@ -364,6 +394,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
                            case p~n1~d~c~n2~e~o => "scoped-constant-ex("+p+"::"+c+"="+o+")" } |
              DoubleCOLON ~ ConstantIdentifier ~ not(LineTerminator) ~ EQUAL ~ operatorExpression ^^ {
                            case d~c~n2~e~o => "scoped-constant-ex(::"+c+"="+o+")" }
+
   lazy val scopedConstantAssignmentStatement: Parser[String] =
              primaryExpression ~ not(WS) ~ DoubleCOLON ~ ConstantIdentifier ~ not(LineTerminator) ~
                  EQUAL ~ methodInvocationWithoutParentheses ^^ {
@@ -376,6 +407,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
   lazy val singleIndexingAssignmentExpression: Parser[String] =
              primaryExpression  ~ not(WS) ~ LBRACKET ~ ??(indexingArgumentList) ~ RBRACKET ~ not(LineTerminator) ~
                  EQUAL ~ operatorExpression ^^ { case p~n1~l~i~r~n2~e~o => "single-indexing-ex("+p+"["+i+"]="+o+")" }
+
   lazy val singleIndexingAssignmentStatement: Parser[String] =
              primaryExpression  ~ not(WS) ~ LBRACKET ~ ??(indexingArgumentList) ~ RBRACKET ~ not(LineTerminator) ~
                  EQUAL ~ methodInvocationWithoutParentheses ^^ {
@@ -389,6 +421,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
                            case p~n1~d~l~n2~e~o => "single-method-ex("+p+d+l+"="+o+")" } |
              primaryExpression ~ not(LineTerminator) ~ PERIOD ~ ConstantIdentifier ~ not(LineTerminator) ~
                  EQUAL ~ operatorExpression ^^ { case pe~n1~p~c~n2~e~o => "single-method-ex("+pe+p+c+"="+o+")" }
+
   lazy val singleMethodAssignmentStatement: Parser[String] =
              primaryExpression ~ not(LineTerminator) ~ (PERIOD | DoubleCOLON) ~ LocalVariableIdentifier ~
                  not(LineTerminator) ~ EQUAL ~ methodInvocationWithoutParentheses ^^ {
@@ -403,6 +436,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
              abbreviatedVariableAssignmentExpression |
              abbreviatedIndexingAssignmentExpression |
              abbreviatedMethodAssignmentExpression
+
   lazy val abbreviatedAssignmentStatement: Parser[String] =
              abbreviatedVariableAssignmentStatement |
              abbreviatedIndexingAssignmentStatement |
@@ -413,6 +447,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
   lazy val abbreviatedVariableAssignmentExpression: Parser[String] =
              variable ~ not(LineTerminator) ~ assignmentOperator ~ operatorExpression ^^ {
                            case v~n~a~o => "abbreviated-variable-ex("+v+a+o+")" }
+
   lazy val abbreviatedVariableAssignmentStatement: Parser[String] =
              variable ~ not(LineTerminator) ~ assignmentOperator ~ methodInvocationWithoutParentheses ^^ {
                            case v~n~a~m => "abbreviated-variable-st("+v+a+m+")" }
@@ -423,6 +458,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
              primaryExpression ~ not(WS) ~ LBRACKET ~ ??(indexingArgumentList) ~ RBRACKET ~ not(LineTerminator) ~
                  assignmentOperator ~ operatorExpression ^^ {
                            case p~n1~l~i~r~n2~a~o => "abbreviated-indexing-ex("+p+l+i+r+a+o+")" }
+
   lazy val abbreviatedIndexingAssignmentStatement: Parser[String] =
              primaryExpression ~ not(WS) ~ LBRACKET ~ ??(indexingArgumentList) ~ RBRACKET ~ not(LineTerminator) ~
                  assignmentOperator ~ methodInvocationWithoutParentheses ^^ {
@@ -437,6 +473,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
              primaryExpression ~ not(LineTerminator) ~ PERIOD ~ ConstantIdentifier ~ not(LineTerminator) ~
                  assignmentOperator ~ operatorExpression ^^ {
                            case pe~n1~p~c~n2~a~o => "abbreviated-method-st("+pe+p+c+a+o+")" }
+
   lazy val abbreviatedMethodAssignmentStatement: Parser[String] =
              primaryExpression ~ not(LineTerminator) ~ (PERIOD | DoubleCOLON) ~ LocalVariableIdentifier ~
                  not(LineTerminator) ~  assignmentOperator ~ methodInvocationWithoutParentheses ^^ {
@@ -455,21 +492,26 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
              manyToOneAssignmentStatement |
              oneToPackingAssignmentStatement |
              manyToManyAssignmentStatement
+
   lazy val manyToOneAssignmentStatement: Parser[String] =
              leftHandSide ~ not(LineTerminator) ~ EQUAL ~ multipleRightHandSide ^^ {
                            case l~n~e~m => "many-to-one-st("+l+"="+m+")" }
+
   lazy val oneToPackingAssignmentStatement: Parser[String] =
              packingLeftHandSide ~ not(LineTerminator) ~
                  EQUAL ~ ( methodInvocationWithoutParentheses | operatorExpression ) ^^ {
                            case p~n~e~m => "one-to-packing-st("+p+"="+m+")" }
+
   lazy val manyToManyAssignmentStatement: Parser[String] =
              multipleLeftHandSide ~ not(LineTerminator) ~ EQUAL ~ multipleRightHandSide ^^ {
                            case ml~n~e~mr => "many-to-many-st("+ml+"="+mr+")" } |
              multipleButNotPackingLeftHandSide ~ not(LineTerminator) ~
                  EQUAL ~ ( methodInvocationWithoutParentheses | operatorExpression ) ^^ {
                            case ml~n~e~m => "many-to-many-st("+ml+"="+m+")" }
+
   lazy val multipleButNotPackingLeftHandSide: Parser[String] =
              not(packingLeftHandSide) ~ multipleLeftHandSide ^^ { case n~m => m }
+
   lazy val leftHandSide: Parser[String] =
              primaryExpression ~ not(WS) ~ LBRACKET ~ ??(indexingArgumentList) ~ RBRACKET ^^ {
                            case p~n~l~i~r => p+"["+i+"]" } |
@@ -477,24 +519,30 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
                  ( LocalVariableIdentifier | ConstantIdentifier ) ^^ { case pe~n~p~i => pe+p+i } |
              DoubleCOLON ~ ConstantIdentifier ^^ { case d~c => "::"+c } |
              variable
+
   lazy val multipleLeftHandSide: Parser[String] =
              ((( multipleLeftHandSideItem ~ not(LineTerminator) ~ COMMA ^^ {case m~n~c => m+", "})+) ^^ {
                    (_).mkString }) ~ ??(multipleLeftHandSideItem | packingLeftHandSide) ^^ { case s~m => s+m } |
              packingLeftHandSide |
              groupedLeftHandSide
+
   lazy val packingLeftHandSide: Parser[String] =
              STAR ~ ??(leftHandSide) ^^ { case s~l => s+l }
+
   lazy val groupedLeftHandSide: Parser[String] =
              LPAREN ~ multipleLeftHandSide ~ RPAREN ^^ { case l~m~r => "("+m+")" }
+
   lazy val multipleLeftHandSideItem: Parser[String] =
              leftHandSide |
              groupedLeftHandSide
+
   lazy val multipleRightHandSide: Parser[String] =
              operatorExpressionList ~ not(LineTerminator) ~ COMMA ~ splattingRightHandSide  ^^ {
                            case o~n~c~s => "multiple-right("+o+", "+s+")" } |
              operatorExpression ~ not(LineTerminator) ~ COMMA ~ operatorExpressionList ^^ {
                            case o1~n~c~o2 => "multiple-right("+o1+", "+o2+")" } |
              splattingRightHandSide ^^ { case s => "multiple-right("+s+")" }
+
   lazy val splattingRightHandSide: Parser[String] =
              splattingArgument ^^ { case s => "splatting-right("+s+")" }
 
@@ -509,6 +557,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
   lazy val unaryMinusExpression: Parser[String] =
              powerExpression  |
              MINUS ~ powerExpression ^^ { case m~p => "-"+p }
+
   lazy val unaryExpression: Parser[String] =
              primaryExpression |
              TILDE ~ unaryExpression ^^ { case t~u => "~"+u } |
@@ -519,6 +568,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
 
   lazy val definedWithParentheses: Parser[String] =
              DEFINED ~ LPAREN ~ expression ~ RPAREN ^^ { case d~l~e~r => "defind?("+e+")" }
+
   lazy val definedWithoutParentheses: Parser[String] =
              DEFINED ~ operatorExpression ^^ { case d~o => "defind?("+o+")" }
 
@@ -526,28 +576,36 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
 
   lazy val equalityExpression: Parser[String] = memo(
              relationalExpression ~ ??(relationalOperation)  ^^ { case e~r => e+r } )
+
   lazy val relationalOperation: Parser[String] =
              not(LineTerminator) ~ relationalOperator ~ relationalExpression ^^ { case n~o~e => o+e }
-  lazy val relationalOperator: Parser[String] =
-             LtEqGT | DoubleEQ | TripleEQ | NotEQ | EqTILDE | NotTILDE
+
+  lazy val relationalOperator: Parser[String] = LtEqGT | DoubleEQ | TripleEQ | NotEQ | EqTILDE | NotTILDE
+
   lazy val relationalExpression: Parser[String] =
              chainl1 ( bitwiseOrExpression, not(LineTerminator) ~ (GT | GtEQ | LT | LtEQ) ^^ {
                            case n~op => (l: String, r: String) => "("+ l+" "+op+" "+r +")" } )
+
   lazy val bitwiseOrExpression: Parser[String] =
              chainl1 ( bitwiseAndExpression, not(LineTerminator) ~ (VerticalBAR | HAT) ^^ {
                            case n~op => (l: String, r: String) => "("+ l+" "+op+" "+r +")" } )
+
   lazy val bitwiseAndExpression: Parser[String] =
              chainl1 ( bitwiseShiftExpression, not(LineTerminator) ~ AMPERSAND ^^ {
                            case n~op => (l: String, r: String) => "("+ l+" "+op+" "+r +")" } )
+
   lazy val bitwiseShiftExpression: Parser[String] =
              chainl1 ( additiveExpression, not(LineTerminator) ~ (LtLT | GtGT) ^^ {
                            case n~op => (l: String, r: String) => "("+ l+" "+op+" "+r +")" } )
+
   lazy val additiveExpression: Parser[String] =
              chainl1 ( multiplicativeExpression, not(LineTerminator) ~ (PLUS | MINUS) ^^ {
                            case n~op => (l: String, r: String) => "("+ l+" "+op+" "+r +")" } )
+
   lazy val multiplicativeExpression: Parser[String] =
              chainl1 ( unaryMinusExpression, not(LineTerminator) ~ (MULT | DIV | PERCENT) ^^ {
                            case n~op => (l: String, r:String) => "(" + l+op+r +")" })
+
   lazy val powerExpression: Parser[String] =
              unaryExpression ~ not(LineTerminator) ~ StarSTAR ~ powerExpression ^^ {
                            case u~n~s~p => "("+u+"**"+p+")" } |
@@ -601,11 +659,14 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
   lazy val ifExpression: Parser[String] =
              IF ~ expression ~ thenClause ~ (((elsifClause)*) ^^ { (_).mkString("", "\n", "") }) ~
                  ??(elseClause) ~ END ^^ { case i~ex~t~ei~el~en => "if "+ex+" "+t+" "+ei+"\n "+el+" end" }
+
   lazy val thenClause: Parser[String] =
              separator ~ compoundStatement ^^ { case s~c => s+c } |
              separator ~ THEN ~ compoundStatement ^^ { case s~t~c => s+" then "+c }
+
   lazy val elseClause: Parser[String] =
              ELSE ~ compoundStatement ^^ { case e~c => "else "+c }
+
   lazy val elsifClause: Parser[String] =
              ELSIF ~ expression ~ thenClause ^^ { case ei~e~t => "elsif "+e+t }
 
@@ -617,17 +678,19 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
 
 // 11.5.2.2.4 The case expression
 
-  lazy val caseExpression: Parser[String] =
-             caseExpressionWithExpression |
-             caseExpressionWithoutExpression
+  lazy val caseExpression: Parser[String] = caseExpressionWithExpression | caseExpressionWithoutExpression
+
   lazy val caseExpressionWithExpression: Parser[String] =
              CASE ~ expression ~ ??(separatorList) ~ (((whenClause)+) ^^ { (_).mkString("", "\n", "") }) ~
                  ??(elseClause) ~ END ^^ { case c~ex~s~w~el~en => "case "+ex+s+w+el+" end" }
+
   lazy val caseExpressionWithoutExpression: Parser[String] =
              CASE ~ ??(separatorList) ~ (((whenClause)+) ^^ { (_).mkString("", "\n", "") }) ~
                  ??(elseClause) ~ END ^^ { case c~s~w~el~en => "case "+s+w+el+" end" }
+
   lazy val whenClause: Parser[String] = WHEN ~ whenArgument ~ thenClause ^^ {
                              case w~a~t => "when "+a+t }
+
   lazy val whenArgument: Parser[String] =
              operatorExpressionList ~ ??(not(LineTerminator) ~ COMMA ~ splattingArgument ^^ {
                              case n~c~s => ", "+s }) ^^ { case o~s => o+s } |
@@ -645,6 +708,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
 
   lazy val whileExpression: Parser[String] =
              WHILE ~ expression ~ doClause ~ END ^^ { case w~ex~d~en => "while "+ex+d+" end-while" }
+
   lazy val doClause: Parser[String] =
              separator ~ compoundStatement ^^ { case s~c => s+c } |
              not(LineTerminator) ~ DO ~ compoundStatement ^^ { case n~d~c => "do "+c }
@@ -658,77 +722,73 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
   lazy val forExpression: Parser[String] =
              FOR ~ forVariable ~ not(LineTerminator) ~ IN ~ expression ~ doClause ~ END ^^ {
                             case f~v~n~i~ex~d~en => "for "+v+" in "+ex+d+" end-for" }
-  lazy val forVariable: Parser[String] =
-             leftHandSide |
-             multipleLeftHandSide
+
+  lazy val forVariable: Parser[String] = leftHandSide | multipleLeftHandSide
 
 // 11.5.2.4.2 The return expression
 
-  lazy val returnWithoutArgument: Parser[String] =
-             RETURN
-  lazy val returnWithArgument: Parser[String] =
-             RETURN ~ jumpArgument ^^ {case r~j => "(return "+j+")" }
-  lazy val jumpArgument: Parser[String] =
-             not(LineTerminator) ~ argumentList ^^ { case n~a => a }
+  lazy val returnWithoutArgument: Parser[String] = RETURN
+
+  lazy val returnWithArgument: Parser[String] = RETURN ~ jumpArgument ^^ {case r~j => "(return "+j+")" }
+
+  lazy val jumpArgument: Parser[String] = not(LineTerminator) ~ argumentList ^^ { case n~a => a }
 
 // 11.5.2.4.3 The break expression
 
-  lazy val breakWithoutArgument: Parser[String] =
-             BREAK
-  lazy val breakWithArgument: Parser[String] =
-             BREAK ~ jumpArgument ^^ {case b~j => "(break "+j+")" }
+  lazy val breakWithoutArgument: Parser[String] = BREAK
+
+  lazy val breakWithArgument: Parser[String] = BREAK ~ jumpArgument ^^ {case b~j => "(break "+j+")" }
 
 // 11.5.2.4.4 The next expression
 
-  lazy val nextWithoutArgument: Parser[String] =
-             NEXT
-  lazy val nextWithArgument: Parser[String] =
-             NEXT ~ jumpArgument ^^ {case n~j => "(next "+j+")" }
+  lazy val nextWithoutArgument: Parser[String] = NEXT
+
+  lazy val nextWithArgument: Parser[String] = NEXT ~ jumpArgument ^^ {case n~j => "(next "+j+")" }
 
 // 11.5.2.4.5 The redo expression
 
-  lazy val redoExpression: Parser[String] =
-             REDO
+  lazy val redoExpression: Parser[String] = REDO
 
 // 11.5.2.4.6 The retry expression
 
-  lazy val retryExpression: Parser[String] =
-             RETRY
+  lazy val retryExpression: Parser[String] = RETRY
 
 // 11.5.2.5 The begin expression
 
   lazy val beginExpression: Parser[String] =
              BEGIN ~ bodyStatement ~ END ^^ { case b~s~e => "begin "+s+" end-begin" }
+
   lazy val bodyStatement: Parser[String] =
              compoundStatement ~ (((rescueClause)*) ^^ { (_).mkString("", "\n", "") }) ~ ??(elseClause) ~
                  ??(ensureClause) ^^ { case c~r~el~en => c+r+el+en }
+
   lazy val rescueClause: Parser[String] =
              RESCUE ~ not(LineTerminator) ~ ??(exceptionClassList) ~ ??(exceptionVariableAssignment) ~
                  thenClause ^^ { case r~n~ec~ea~t => "rescue "+ec+ea+t }
+
   lazy val exceptionClassList: Parser[String] =
              operatorExpression |
              multipleRightHandSide
-  lazy val exceptionVariableAssignment: Parser[String] =
-             EqGT ~ leftHandSide ^^ { case e~l => "=>"+l }
-  lazy val ensureClause: Parser[String] =
-             ENSURE ~ compoundStatement ^^ { case e~c => "ensure "+c }
+
+  lazy val exceptionVariableAssignment: Parser[String] = EqGT ~ leftHandSide ^^ { case e~l => "=>"+l }
+
+  lazy val ensureClause: Parser[String] = ENSURE ~ compoundStatement ^^ { case e~c => "ensure "+c }
 
 // 11.5.3 Grouping expression
 
-  lazy val groupingExpression: Parser[String] =
-             LPAREN~>compoundStatement<~RPAREN
+  lazy val groupingExpression: Parser[String] = LPAREN~>compoundStatement<~RPAREN
 
 // 11.5.4 Variable references
 
-  lazy val variableReference: Parser[String] =
-             variable |
-             pseudoVariable
+  lazy val variableReference: Parser[String] = variable | pseudoVariable
+
   lazy val variable: Parser[String] =
              ConstantIdentifier |
              GlobalVariableIdentifier |
              ClassVariableIdentifier |
              InstanceVariableIdentifier |
              LocalVariableIdentifier
+
   lazy val scopedConstantReference: Parser[String] =
              DoubleCOLON ~ ConstID ^^ { case d~c => "::"+c } // |
              // primaryExpression ~ not(WS) ~ DoubleCOLON ~ ConstID
@@ -743,20 +803,17 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
 
 // 11.5.4.8.2 The nil expression
 
-  lazy val nilExpression: Parser[String] =
-             NIL
+  lazy val nilExpression: Parser[String] = NIL
 
 // 11.5.4.8.3 The true expression and the false expression
 
-  lazy val trueExpression: Parser[String] =
-             TRUE
-  lazy val falseExpression: Parser[String] =
-             FALSE
+  lazy val trueExpression: Parser[String] = TRUE
+
+  lazy val falseExpression: Parser[String] = FALSE
 
 // 11.5.4.8.4 The self expression
 
-  lazy val selfExpression: Parser[String] =
-             SELF
+  lazy val selfExpression: Parser[String] = SELF
 
 // 11.5.5.1 Array constructor
 
@@ -768,15 +825,17 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
   lazy val hashConstructor: Parser[String] =
              LBRACE ~ ??(associationList ~ not(LineTerminator) ~ ??(COMMA) ^^ { case a~n~c => a+c } ) ~
                  RBRACE ^^ { case l~a~r => "{"+a+"}" }
+
   lazy val associationList: Parser[String] =
              rep1sep ( association, not(LineTerminator) ~ COMMA ) ^^ { (_).mkString("", ", ", "") }
+
   lazy val association: Parser[String] =
              associationKey ~ not(LineTerminator) ~ EqGT ~ associationValue ^^ {
                                  case k~n~e~v => k+"=>"+v }
-  lazy val associationKey: Parser[String] =
-             operatorExpression
-  lazy val associationValue: Parser[String] =
-             operatorExpression
+
+  lazy val associationKey: Parser[String] = operatorExpression
+
+  lazy val associationValue: Parser[String] = operatorExpression
 
 // 11.5.5.3 Range expression
 
@@ -784,6 +843,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
              operatorOrExpression ~ not(LineTerminator) ~ rangeOperator ~ operatorOrExpression ^^ {
                                  case o1~n~r~o2 => o1 + r + o2 } |
              operatorOrExpression
+
   lazy val rangeOperator: Parser[String] =
              DoublePERIOD |
              TriplePERIOD
@@ -798,8 +858,10 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
                  not(LineTerminator) ~ UNTIL ~ expression ^^ { case n~u~e => " until "+e } | // 12.6 until modifier
                  not(LineTerminator) ~ RESCUE ~ fallbackStatement ^^ { case n~r~f => " rescue "+f } // 12.7 rescue modifier
               ) { case (x, y) => "(" + x + y + ")" } )
+
   lazy val fallbackStatement: Parser[String] =
              statement1 // not(keywordAndExpression) ~ not(keywordOrExpression)
+
   lazy val statement1: Parser[String] =
              assignmentStatement |
              expressionStatement |
@@ -808,43 +870,47 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
 
 // 12.2 Expression statement
 
-  lazy val expressionStatement: Parser[String] =
-             expression
+  lazy val expressionStatement: Parser[String] = expression
 
 // 13.1.2 Module definition
 
   lazy val moduleDefinition: Parser[String] =
              MODULE ~ modulePath ~ moduleBody ~ END ^^ { case m~p~b~e => "module "+p+b+"\nend-module" }
-  lazy val modulePath: Parser[String] =
-             topModulePath |
-             moduleName |
-             nestedModulePath
-  lazy val moduleName: Parser[String] =
-             ConstantIdentifier
-  lazy val topModulePath: Parser[String] =
-             DoubleCOLON ~ moduleName ^^ { case d~m => "::"+m }
+
+  lazy val modulePath: Parser[String] = topModulePath | moduleName | nestedModulePath
+
+  lazy val moduleName: Parser[String] = ConstantIdentifier
+
+  lazy val topModulePath: Parser[String] = DoubleCOLON ~ moduleName ^^ { case d~m => "::"+m }
+
   lazy val nestedModulePath: Parser[String] =
              primaryExpression ~ not(LineTerminator) ~ DoubleCOLON ~ moduleName ^^ { case p~n~d~m => p+"::"+m }
-  lazy val moduleBody: Parser[String] =
-             bodyStatement
+
+  lazy val moduleBody: Parser[String] = bodyStatement
 
 // 13.2.2 Class definition
 
   lazy val classDefinition: Parser[String] =
              CLASS ~ classPath ~ ??( not(LineTerminator) ~ LT ~ superclass ^^ { case n~l~s => "< "+s } ) ~
                  separator ~ classBody ~  END ^^ { case c~p~su~sep~b~e => "class "+p+su+sep+b+"\nend-class" }
+
   lazy val classPath: Parser[String] =
              topClassPath |
              className |
              nestedClassPath
+
   lazy val className: Parser[String] =
              ConstantIdentifier
+
   lazy val topClassPath: Parser[String] =
              DoubleCOLON ~ className ^^ { case d~c => "::"+c }
+
   lazy val nestedClassPath: Parser[String] =
              primaryExpression ~ not(LineTerminator) ~ DoubleCOLON ~ className ^^ { case p~n~d~m => p+"::"+m }
+
   lazy val superclass: Parser[String] =
              expression
+
   lazy val classBody: Parser[String] =
              bodyStatement
 
@@ -854,9 +920,11 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
              DEF ~ definedMethodName ~ ( not(LineTerminator) ~ methodParameterPart ^^ { case n~m => m } |
                 separator ^^ { case s => "; " } ) ~ methodBody ~ END ^^ {
                                case d~na~p~b~e => "def "+na+p+b+" end-def" }
+
   lazy val definedMethodName: Parser[String] =
              methodName |
              AssignmentLikeMethodIdentifier
+
   lazy val methodBody: Parser[String] =
              bodyStatement
 
@@ -865,6 +933,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
   lazy val methodParameterPart: Parser[String] =
              LPAREN ~ ??(parameterList) ~ RPAREN ^^ { case l~p~r => "("+p+")" } |
              parameterList ~ separator ^^ { case p~s => p+"; " }
+
   lazy val parameterList: Parser[String] =
              mandatoryParameterList ~ ??( COMMA ~ optionalParameterList ^^ { case c~p => ", "+p } ) ~
                  ??( COMMA ~ arrayParameter ^^ { case c~p => ", "+p } ) ~ ??( COMMA ~ procParameter ^^ {
@@ -873,25 +942,35 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
                  ??( COMMA ~ procParameter ^^ { case c~p => ", "+p } ) ^^ { case o~a~p => o+a+p } |
              arrayParameter ~ ??( COMMA ~ procParameter ^^ { case c~p => ", "+p } ) ^^ { case a~p => a+p } |
              procParameter
+
   lazy val mandatoryParameterList: Parser[String] =
              rep1sep(mandatoryParameter, COMMA) ^^ { (_).mkString("", ", ", "") }
+
   lazy val mandatoryParameter: Parser[String] =
              LocalVariableIdentifier
+
   lazy val optionalParameterList: Parser[String] =
              rep1sep(optionalParameter, COMMA) ^^ { (_).mkString("", ", ", "") }
+
   lazy val optionalParameter: Parser[String] =
              optionalParameterName ~ EQUAL ~ defaultParameterExpression ^^ { case o~e~d => o+"="+d }
+
   lazy val optionalParameterName: Parser[String] =
              LocalVariableIdentifier
+
   lazy val defaultParameterExpression: Parser[String] =
              operatorExpression
+
   lazy val arrayParameter: Parser[String] =
              STAR ~ arrayParameterName ^^ { case s~a => "*"+a } |
              STAR
+
   lazy val arrayParameterName: Parser[String] =
              LocalVariableIdentifier
+
   lazy val procParameter: Parser[String] =
              AMPERSAND ~ procParameterName ^^ { case a~p => "&"+p }
+
   lazy val procParameterName: Parser[String] =
              LocalVariableIdentifier
 
@@ -899,10 +978,13 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
 
   lazy val aliasStatement: Parser[String] =
              ALIAS ~ newName ~ aliasedName ^^ { case a~nn~an => "alias("+nn+", "+an+")" }
+
   lazy val newName: Parser[String] =
              methodNameOrSymbol
+
   lazy val aliasedName: Parser[String] =
              methodNameOrSymbol
+
   lazy val methodNameOrSymbol: Parser[String] =
              definedMethodName |
              Symbol
@@ -911,6 +993,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
 
   lazy val undefStatement: Parser[String] =
              UNDEF ~ undefList ^^ { case u~l => "undef("+l+")" }
+
   lazy val undefList: Parser[String] =
              rep1sep(methodNameOrSymbol, COMMA) ^^ { (_).mkString("", ", ", "") }
 
@@ -929,6 +1012,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
                  ( not(LineTerminator) ~ methodParameterPart ^^ { case n~m => m } |
                    separator ^^ { case s => ";" } ) ~ methodBody ~ END ^^ {
                                  case d~s~pc~dn~p~b~e => "def "+s+pc+dn+p+b+" end-def" }
+
   lazy val singletonObject: Parser[String] =
              variableReference |
              LPAREN ~ expression ~ RPAREN ^^ { case l~e~r => "("+e+")" }
@@ -938,25 +1022,33 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
   lazy val Comment: Parser[String] =
              SingleLineComment |
              MultiLineComment
+
   lazy val SingleLineComment: Parser[String] =
              regex("""#""".r) ~ CommentContent ^^ { case s~c => s+c }
+
   lazy val CommentContent: Parser[String] =
              LineContent
+
   lazy val LineContent: Parser[String] =
              (( not(LineTerminator) ~ SourceCharacter ^^ { case n~s => s } )*) ^^ { (_).mkString }
+
   lazy val MultiLineComment: Parser[String] =
              MultiLineCommentBeginLine ~ ((MultiLineCommentLine*) ^^ { (_).mkString } ) ~
                  MultiLineCommentEndLine ^^ { case b~c~e => b+c+e }
+
   lazy val MultiLineCommentBeginLine: Parser[String] =
              regex("""^=begin""".r) ~ ??(RestOfBeginEndLine) ~ LineTerminator ^^ { case b~r~l => b+r+l }
+
   lazy val MultiLineCommentEndLine: Parser[String] =
              regex("""^=end""".r) ~ ??(RestOfBeginEndLine) ~ ( LineTerminator | regex("""\z""".r) ) ^^ {
                                        case e~r~l => e+r+"\n" }
   lazy val RestOfBeginEndLine: Parser[String] =
                (((not(LineTerminatorEscapeSequence) ~ Whitespace ^^ { case n~w => w })+) ^^ {
                                        (_).mkString } ) ~ CommentContent ^^ { case w~c => w+c }
+
   lazy val MultiLineCommentLine: Parser[String] =
              not(MultiLineCommentEndLine) ~ CommentLine ^^ { case n~c => c }
+
   lazy val CommentLine: Parser[String] =
              CommentContent ~ LineTerminator ^^ { case c~l => c+"\n" }
 
@@ -964,6 +1056,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
 
   lazy val Keyword: Parser[String] =
              KeywordString ~ not(IdentifierCharacter) ^^ { case k~n => k }
+
   lazy val KeywordString: Parser[String] =
              LINE | ENCODING | FILE | UpBEGIN | UpEND | ALIAS | AND | BEGIN | BREAK |
              CASE | CLASS | DEF | DEFINED | DO | ELSE | ELSIF | END | ENSURE | FOR | FALSE | IF | IN |
@@ -974,16 +1067,22 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
 
   lazy val LocalVariableIdentifier: Parser[String] =
              not(Keyword) ~ not(MethodID) ~ LocalID ^^ { case n1~n2~l => l }
+
   lazy val GlobalVariableIdentifier: Parser[String] =
              GlobalID
+
   lazy val ClassVariableIdentifier: Parser[String] =
              ClassID
+
   lazy val InstanceVariableIdentifier: Parser[String] =
              InstanceID
+
   lazy val ConstantIdentifier: Parser[String] =
              ConstID
+
   lazy val MethodOnlyIdentifier: Parser[String] =
              (LocalID | ConstID) ~ (NotOP | QUESTION) ^^ { case i~q => i+q }
+
   lazy val AssignmentLikeMethodIdentifier: Parser[String] =
              ( ConstantIdentifier | LocalVariableIdentifier ) ~ EQUAL ^^ { case i~e => i+"=" }
 
@@ -997,6 +1096,7 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
 
   lazy val literal: Parser[String] =
              anySpace~>literalString
+
   lazy val literalString: Parser[String] =
              NumericLiteral |
              StringLiteral |
@@ -1006,63 +1106,69 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
 
 // 8.7.6.2 Numeric literals
 
-  lazy val NumericLiteral: Parser[String] =
-             SignedNumber |
-             UnsignedNumber
-  lazy val SignedNumber: Parser[String] =
-             regex("""\+|\-""".r) ~ UnsignedNumber ^^ { case r~u => r+u }
+  lazy val NumericLiteral: Parser[String] = SignedNumber | UnsignedNumber
+
+  lazy val SignedNumber: Parser[String] = regex("""\+|\-""".r) ~ UnsignedNumber ^^ { case r~u => r+u }
+
   lazy val UnsignedNumber: Parser[String] =
              FloatLiteral |
              IntegerLiteral
+
   lazy val IntegerLiteral: Parser[String] =
              DecimalIntegerLiteral |
              BinaryIntegerLiteral |
              OctalIntegerLiteral |
              HexadecimalIntegerLiteral
+
   lazy val DecimalIntegerLiteral: Parser[String] =
              UnprefixedDecimalIntegerLiteral |
              PrefixedDecimalIntegerLiteral
+
   lazy val UnprefixedDecimalIntegerLiteral: Parser[String] =
              regex("""0""".r) |
              DecimalDigitExceptZero ~ ((( ??(regex("""_""".r)) ~ DecimalDigit ^^ { case r~d => r+d } )*) ^^ {
                                        (_).mkString } ) ^^ { case d~r => d+r }
+
   lazy val PrefixedDecimalIntegerLiteral: Parser[String] =
              regex("""0(d|D)""".r) ~ DigitDecimalPart ^^ { case r~d => r+d }
+
   lazy val DigitDecimalPart: Parser[String] =
              DecimalDigit ~ ((( ??(regex("""_""".r)) ~ DecimalDigit ^^ { case r~d => r+d } )*) ^^ {
                                 (_).mkString } ) ^^ { case d~r => d+r }
+
   lazy val BinaryIntegerLiteral: Parser[String] =
              regex("""0(b|B)""".r) ~ BinaryDigit ~ ((( ??(regex("""_""".r)) ~ BinaryDigit ^^ {
                                   case r~b => r+b } )*) ^^ { (_).mkString } ) ^^ { case r~b1~b2 => r+b1+b2 }
+
   lazy val OctalIntegerLiteral: Parser[String] =
              regex("""0(_|o|O)""".r) ~ OctalDigit ~ ((( ??(regex("""_""".r)) ~ OctalDigit ^^ {
                                   case r~o => r+o } )*) ^^ { (_).mkString } ) ^^ { case r~o1~o2 => r+o1+o2 }
+
   lazy val HexadecimalIntegerLiteral: Parser[String] =
              regex("""0(x|X)""".r) ~ HexadecimalDigit ~ ((( ??(regex("""_""".r)) ~ HexadecimalDigit ^^ {
                                   case r~x => r+x } )*) ^^ { (_).mkString } ) ^^ { case r~x1~x2 => r+x1+x2 }
-  lazy val FloatLiteral: Parser[String] =
-             FloatLiteralWithExponent |
-             FloatLiteralWithoutExponent
+
+  lazy val FloatLiteral: Parser[String] = FloatLiteralWithExponent | FloatLiteralWithoutExponent
+
   lazy val FloatLiteralWithoutExponent: Parser[String] =
              UnprefixedDecimalIntegerLiteral ~ regex("""\.""".r) ~ DigitDecimalPart ^^ { case u~r~d => u+"."+d }
+
   lazy val FloatLiteralWithExponent: Parser[String] =
              SignificandPart ~ ExponentPart ^^ { case s~e => s+e }
-  lazy val SignificandPart: Parser[String] =
-             FloatLiteralWithoutExponent |
-             UnprefixedDecimalIntegerLiteral
-  lazy val ExponentPart: Parser[String] =
-             regex("""(e|E)(\+|\-)?""".r) ~ DigitDecimalPart ^^ { case e~d => e+d }
-  lazy val DecimalDigit: Parser[String] =
-             regex("""[0-9]""".r)
-  lazy val DecimalDigitExceptZero: Parser[String] =
-             regex("""[1-9]""".r)
-  lazy val BinaryDigit: Parser[String] =
-             regex("""0|1""".r)
-  lazy val OctalDigit: Parser[String] =
-             regex("""[0-7]""".r)
-  lazy val HexadecimalDigit: Parser[String] =
-             DecimalDigit |
-             regex("""[a-fA-F]""".r)
+
+  lazy val SignificandPart: Parser[String] = FloatLiteralWithoutExponent | UnprefixedDecimalIntegerLiteral
+
+  lazy val ExponentPart: Parser[String] = regex("""(e|E)(\+|\-)?""".r) ~ DigitDecimalPart ^^ { case e~d => e+d }
+
+  lazy val DecimalDigit: Parser[String] = regex("""[0-9]""".r)
+
+  lazy val DecimalDigitExceptZero: Parser[String] = regex("""[1-9]""".r)
+
+  lazy val BinaryDigit: Parser[String] = regex("""0|1""".r)
+
+  lazy val OctalDigit: Parser[String] = regex("""[0-7]""".r)
+
+  lazy val HexadecimalDigit: Parser[String] = DecimalDigit | regex("""[a-fA-F]""".r)
 
 // 8.7.6.3 String literals
 
@@ -1079,18 +1185,24 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
   lazy val SingleQuotedString: Parser[String] =
              regex("""'""".r) ~ ((SingleQuotedStringCharacter*) ^^ { (_).mkString } ) ~ regex("""'""".r) ^^ {
                                    case r1~s~r2 => "'"+s+"'" }
+
   lazy val SingleQuotedStringCharacter: Parser[String] =
              SingleQuotedStringNonEscapedCharacter |
              SingleQuotedEscapeSequence
+
   lazy val SingleQuotedEscapeSequence: Parser[String] =
              SingleEscapeCharacterSequence |
              SingleQuotedStringNonEscapedCharacterSequence
+
   lazy val SingleEscapeCharacterSequence: Parser[String] =
              regex("""\\""".r) ~ SingleQuotedStringMetaCharacter ^^ { case r~s => "\\"+s }
+
   lazy val SingleQuotedStringNonEscapedCharacterSequence: Parser[String] =
              regex("""\\""".r) ~ SingleQuotedStringNonEscapedCharacter ^^ { case r~s => "\\"+s }
+
   lazy val SingleQuotedStringMetaCharacter: Parser[String] =
              regex("""'|\\""".r)
+
   lazy val SingleQuotedStringNonEscapedCharacter: Parser[String] =
              not(SingleQuotedStringMetaCharacter) ~ SourceCharacter ^^ { case n~s => s }
 
@@ -1099,13 +1211,16 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
   lazy val DoubleQuotedString: Parser[String] =
              regex(""""""".r) ~ ((DoubleQuotedStringCharacter*) ^^ { (_).mkString } ) ~ regex(""""""".r) ^^ {
                                    case r1~s~r2 => "\""+s+"\"" }
+
   lazy val DoubleQuotedStringCharacter: Parser[String] =
              not(regex(""""|#|\\""".r)) ~ SourceCharacter ^^ { case n~s => s } |
              regex("""#""".r) ~ not(LookaheadCharacter) ^^ { case r~n => "#" } |
              DoubleEscapeSequence |
              InterpolatedCharacterSequence
+
   lazy val LookaheadCharacter: Parser[String] =
              regex("""\$|@|\{""".r)
+
   lazy val DoubleEscapeSequence: Parser[String] =
              SimpleEscapeSequence |
              NonEscapedSequence |
@@ -1113,30 +1228,40 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
              OctalEscapeSequence |
              HexadecimalEscapeSequence |
              ControlEscapeSequence
+
   lazy val SimpleEscapeSequence: Parser[String] =
              regex("""\\""".r) ~ DoubleEscapedCharacter ^^ { case r~d => "\\"+d }
+
   lazy val DoubleEscapedCharacter: Parser[String] =
              regex("""n|t|r|f|v|a|e|b|s""".r)
+
   lazy val NonEscapedSequence: Parser[String] =
              regex("""\\""".r) ~ NonEscapedDoubleQuotedStringCharacter ^^ { case r~n => "\\"+n }
+
   lazy val NonEscapedDoubleQuotedStringCharacter: Parser[String] =
              not( AlphaNumericCharacter | LineTerminator ) ~ SourceCharacter ^^ { case n~s => s }
+
   lazy val OctalEscapeSequence: Parser[String] =
              regex("""\\""".r) ~ OctalDigit ~ ??(OctalDigit) ~ ??(OctalDigit) ^^ {
                                      case r~o1~o2~o3 => "\\"+o1+o2+o3 }
+
   lazy val HexadecimalEscapeSequence: Parser[String] =
              regex("""\\x""".r) ~ HexadecimalDigit ~ ??(HexadecimalDigit) ^^ { case r~h1~h2 => "\\x"+h1+h2 }
+
   lazy val ControlEscapeSequence: Parser[String] =
              regex("""\\(C\-|c)""".r) ~ ControlEscapeCharacter ^^ { case r~c => r+c }
+
   lazy val ControlEscapeCharacter: Parser[String] =
              DoubleEscapeSequence |
              regex("""\?""".r) |
              not( regex("""\\|\?""".r) ) ~ SourceCharacter ^^ { case n~s => s }
+
   lazy val InterpolatedCharacterSequence: Parser[String] =
              regex("""#""".r) ~ GlobalVariableIdentifier ^^ { case r~i => "#"+i } |
              regex("""#""".r) ~ ClassVariableIdentifier ^^ { case r~i => "#"+i } |
              regex("""#""".r) ~ InstanceVariableIdentifier ^^ { case r~i => "#"+i } |
              regex("""#\{""".r) ~ compoundStatement ~ regex("""\}""".r) ^^ { case r1~s~r2 => "#{"+s+"}" }
+
   lazy val AlphaNumericCharacter: Parser[String] =
              UppercaseCharacter |
              LowercaseCharacter |
@@ -1150,37 +1275,51 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
              LiteralBeginningDelimiter >> {
                  case literalBegin => ( (NonExpandedLiteralString(literalBegin)*) ^^ { (_).mkString } ) ~
                           LiteralEndingDelimiter2(literalBegin) ^^ { case s~e => literalBegin+s+e } }
+
   def NonExpandedLiteralString(literalBegin: String): Parser[String] =
              (if (literalBegin == "{" || literalBegin == "(" || literalBegin == "[" || literalBegin == "<" )
                  NonExpandedDelimitedString2(literalBegin) else failure("not matched") ) |
              NonExpandedLiteralCharacter(literalBegin)
+
   def NonExpandedDelimitedString2(literalBegin: String): Parser[String] =
              LiteralBeginningDelimiter2(literalBegin) ~ ((NonExpandedLiteralString(literalBegin)*) ^^ {
                   (_).mkString } ) ~ LiteralEndingDelimiter2(literalBegin) ^^ {  case b~s~e => b+s+e }
+
   def NonExpandedLiteralCharacter(literalBegin: String): Parser[String] =
              NonEscapedLiteralCharacter(literalBegin) |
              NonExpandedLiteralEscapeSequence(literalBegin)
+
   def NonEscapedLiteralCharacter(literalBegin: String): Parser[String] =
              not(QuotedLiteralEscapeCharacter(literalBegin)) ~ SourceCharacter ^^ { case n~s => s }
+
   def NonExpandedLiteralEscapeSequence(literalBegin: String): Parser[String] =
              NonExpandedLiteralEscapeCharacterSequence(literalBegin) |
              NonEscapedNonExpandedLiteralCharacterSequence(literalBegin)
+
   def NonExpandedLiteralEscapeCharacterSequence(literalBegin: String): Parser[String] =
              regex("""\\""".r) ~ NonExpandedLiteralEscapedCharacter(literalBegin) ^^ { case r~n => "\\"+n }
+
   def NonExpandedLiteralEscapedCharacter(literalBegin: String): Parser[String] =
              LiteralBeginningDelimiter2(literalBegin) | LiteralEndingDelimiter2(literalBegin) | regex("""\\""".r)
+
   def QuotedLiteralEscapeCharacter(literalBegin: String): Parser[String] =
              NonExpandedLiteralEscapedCharacter(literalBegin)
+
   def NonEscapedNonExpandedLiteralCharacterSequence(literalBegin: String): Parser[String] =
              regex("""\\""".r) ~ NonEscapedNonExpandedLiteralCharacter(literalBegin) ^^ { case r~n => "\\"+n }
+
   def NonEscapedNonExpandedLiteralCharacter(literalBegin: String): Parser[String] =
              not(NonExpandedLiteralEscapedCharacter(literalBegin)) ~ SourceCharacter ^^ { case n~s => s }
+
   lazy val LiteralBeginningDelimiter: Parser[String] =
              not(AlphaNumericCharacter) ~ SourceCharacter ^^ { case n~s => s }
+
   lazy val LiteralEndingDelimiter: Parser[String] =
              not(AlphaNumericCharacter) ~ SourceCharacter ^^ { case n~s => s }
+
   def LiteralBeginningDelimiter2(beginString: String): Parser[String] =
              LiteralBeginningDelimiter ^? { case b if beginString == b => b }
+
   def LiteralEndingDelimiter2(beginString: String): Parser[String] =
              LiteralEndingDelimiter ^? {
                  case "}" if beginString == "{" => "}"
@@ -1194,16 +1333,20 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
 
   lazy val QuotedExpandedLiteralString: Parser[String] =
              regex("""%Q?""".r) ~ ExpandedDelimitedString ^^ { case r~n => r+n }
+
   lazy val ExpandedDelimitedString: Parser[String] =
              LiteralBeginningDelimiter >> { case literalBegin => ((ExpandedLiteralString(literalBegin)*) ^^ {
                  (_).mkString } ) ~ LiteralEndingDelimiter2(literalBegin) ^^ { case s~e => literalBegin+s+e } }
+
   def ExpandedLiteralString(literalBegin: String): Parser[String] =
              (if (literalBegin == "{" || literalBegin == "(" || literalBegin == "[" || literalBegin == "<" )
                  ExpandedDelimitedString2(literalBegin) else failure("not matched") ) |
              ExpandedLiteralCharacter(literalBegin)
+
   def ExpandedDelimitedString2(literalBegin: String): Parser[String] =
              LiteralBeginningDelimiter2(literalBegin) ~ ((ExpandedLiteralString(literalBegin)*) ^^ { (_).mkString } ) ~
                  LiteralEndingDelimiter2(literalBegin) ^^ {  case b~s~e => b+s+e }
+
   def ExpandedLiteralCharacter(literalBegin: String): Parser[String] =
              not(regex("""#""".r)) ~ NonEscapedLiteralCharacter(literalBegin) ^^ { case n~c => c } |
              not(regex("""\$|@|\{""".r)) ~ regex("""#""".r) ^^ { case n~r => r } |
@@ -1250,51 +1393,69 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
 //                 HeredocEndLine(heredocDelimiter) ^^ { case b~e => "Heredoc(\n"+b+")" } }
   lazy val HeredocStartLine: Parser[(String, String)] =
              HeredocSignifier ~ RestOfLine ^^ { case s~r => (s, r) }
+
 //  lazy val HeredocStartLine: Parser[String] =
 //             HeredocSignifier ~ RestOfLine ^^ { case s~r => s }
   lazy val HeredocSignifier: Parser[String] =
              regex("""<<""".r) ~ HeredocDelimiterSpecifier ^^ { case r~s => s }
+
   lazy val RestOfLine: Parser[String] =
              LineContent ~ LineTerminator ^^ { case c~t => c+"\n" }
+
   def HeredocBody(heredocDelimiter: String): Parser[String] =
              (HeredocBodyLine(heredocDelimiter)*) ^^ { (_).mkString }
+
   def HeredocBodyLine(heredocDelimiter: String): Parser[String] =
              not(HeredocEndLine(heredocDelimiter)) ~ LineContent ~ LineTerminator ^^ { case n~c~t => c+"\n" }
+
   lazy val HeredocDelimiterSpecifier: Parser[String] =
              regex("""\-?""".r) ~ HeredocDelimiter ^^ { case r~d => r+d }
+
   lazy val HeredocDelimiter: Parser[String] =
              NonQuotedDelimiter |
              SingleQuotedDelimiter |
              DoubleQuotedDelimiter |
              CommandQuotedDelimiter
+
   lazy val NonQuotedDelimiter: Parser[String] =
              NonQuotedDelimiterIdentifier
+
   lazy val NonQuotedDelimiterIdentifier: Parser[String] =
              (IdentifierCharacter*) ^^ { (_).mkString }
+
   lazy val SingleQuotedDelimiter: Parser[String] =
              regex("""'""".r) ~ SingleQuotedDelimiterIdentifier ~ regex("""'""".r) ^^ {
                                    case r1~i~r2 => "'"+i+"'" }
+
   lazy val SingleQuotedDelimiterIdentifier: Parser[String] =
              ( (not(regex("""'""".r) | LineTerminator) ~ SourceCharacter)*) ^^ { (_).mkString }
+
   lazy val DoubleQuotedDelimiter: Parser[String] =
              regex(""""""".r) ~ DoubleQuotedDelimiterIdentifier ~ regex(""""""".r) ^^ {
                                    case r1~i~r2 => "\""+i+"\"" }
+
   lazy val DoubleQuotedDelimiterIdentifier: Parser[String] =
              ( (not(regex(""""""".r) | LineTerminator) ~ SourceCharacter)*) ^^ { (_).mkString }
+
   lazy val CommandQuotedDelimiter: Parser[String] =
              regex("""`""".r) ~ CommandQuotedDelimiterIdentifier ~ regex("""`""".r) ^^ {
                                    case r1~i~r2 => "`"+i+"`" }
+
   lazy val CommandQuotedDelimiterIdentifier: Parser[String] =
              ( (not(regex("""`""".r) | LineTerminator) ~ SourceCharacter)*) ^^ { (_).mkString }
+
   def HeredocEndLine(heredocDelimiter: String): Parser[String] =
              if (heredocDelimiter.head == '-') IndentedHeredocEndLine(heredocDelimiter) else
                    NonIndentedHeredocEndLine(heredocDelimiter)
+
   def IndentedHeredocEndLine(heredocDelimiter: String): Parser[String] =
              regex("""^""".r) ~ ((Whitespace*) ^^ { (_).mkString }) ~ ( HeredocDelimiterIdentifier ^? {
                  case a if a == heredocDelimiter => a }) ~ LineTerminator ^^ { case r~w~i~t => w+i+"\n" }
+
   def NonIndentedHeredocEndLine(heredocDelimiter: String): Parser[String] =
              regex("""^""".r) ~ ( HeredocDelimiterIdentifier ^? { case a if a == heredocDelimiter => a }) ~
                  LineTerminator ^^ { case r~i~t => i+"\n" }
+
   lazy val HeredocDelimiterIdentifier: Parser[String] =
              NonQuotedDelimiterIdentifier |
              SingleQuotedDelimiterIdentifier |
@@ -1306,14 +1467,17 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
   lazy val ExternalCommandExecution: Parser[String] =
              BackquotedExternalCommandExecution |
              QuotedExternalCommandExecution
+
   lazy val BackquotedExternalCommandExecution: Parser[String] =
              regex("""`""".r) ~ ((BackquotedExternalCommandExecutionCharacter*) ^^ { (_).mkString } ) ~
                  regex("""`""".r) ^^ { case r1~s~r2 => "`"+s+"`" }
+
   lazy val BackquotedExternalCommandExecutionCharacter: Parser[String] =
              not(regex("""`|#|\\""".r)) ~ SourceCharacter ^^ { case n~c => c } |
              not(regex("""\$|@|\{""".r)) ~ regex("""#""".r) ^^ { case n~r => r } |
              DoubleEscapeSequence |
              InterpolatedCharacterSequence
+
   lazy val QuotedExternalCommandExecution: Parser[String] =
              regex("""%x""".r) ~ ExpandedDelimitedString ^^ { case r~n => r+n }
 
@@ -1322,47 +1486,62 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
   lazy val ArrayLiteral: Parser[String] =
              QuotedNonExpandedArrayConstructor |
              QuotedExpandedArrayConstructor
+
   lazy val QuotedNonExpandedArrayConstructor: Parser[String] =
              regex("""%w""".r) ~ ( LiteralBeginningDelimiter >> { case literalBegin =>
                (NonExpandedArrayContent(literalBegin) >> {case content =>
                  Parser{next => Success(content.split(" ").mkString("__"), next)}
                }) ~ LiteralEndingDelimiter2(literalBegin) ^^ {  case a~e => "'" + literalBegin + "'" + a+ "'" + e + "'" }
              } ) ^^ { case r~s => s"|${r}|" + s }
+
   def NonExpandedArrayContent(literalBegin: String): Parser[String] =
              ??(QuotedArrayItemSeparatorList) ~ ??(NonExpandedArrayItemList(literalBegin)) ~
                  ??(QuotedArrayItemSeparatorList) ^^ { case s1~a~s2 => s1+a+s2 }
+
   def NonExpandedArrayItemList(literalBegin: String): Parser[String] =
              rep1sep(NonExpandedArrayItem(literalBegin),  QuotedArrayItemSeparatorList) ^^ { _.mkString("", ", ", "") }
+
   lazy val QuotedArrayItemSeparatorList: Parser[String] =
              (QuotedArrayItemSeparator+) ^^ {  (_).mkString }
+
   lazy val QuotedArrayItemSeparator: Parser[String] =
              Whitespace |
              LineTerminator
+
   def NonExpandedArrayItem(literalBegin: String): Parser[String] =
              (NonExpandedArrayItemCharacter(literalBegin)+) ^^ {  (_).mkString }
+
   def NonExpandedArrayItemCharacter(literalBegin: String): Parser[String] =
              NonEscapedArrayCharacter(literalBegin) |
              NonExpandedArrayEscapeSequence(literalBegin)
+
   def NonEscapedArrayCharacter(literalBegin: String): Parser[String] =
              not(QuotedArrayItemSeparator) ~ NonEscapedLiteralCharacter(literalBegin) ^^ { case n~s => s }
+
   def NonExpandedArrayEscapeSequence(literalBegin: String): Parser[String] =
              NonExpandedLiteralEscapeSequence(literalBegin) |
              regex("""\\""".r) ~ QuotedArrayItemSeparator  ^^ { case r~s => r+s }
+
   lazy val QuotedExpandedArrayConstructor: Parser[String] =
              regex("""%W""".r) ~ ( LiteralBeginningDelimiter >> { case literalBegin =>
                  ExpandedArrayContent(literalBegin) ~ LiteralEndingDelimiter2(literalBegin) ^^ {
                                case a~e => literalBegin+a+e } } ) ^^ { case r~s => r+s }
+
   def ExpandedArrayContent(b: String): Parser[String] =
              ??(QuotedArrayItemSeparatorList) ~  ??(ExpandedArrayItemList(b)) ~ ??(QuotedArrayItemSeparatorList) ^^ {
                                case s1~a~s2 => s1+a+s2 }
+
   def ExpandedArrayItemList(b: String): Parser[String] =
              rep1sep(ExpandedArrayItem(b), QuotedArrayItemSeparatorList) ^^ { (_).mkString("", ", ", "") }
+
   def ExpandedArrayItem(b: String): Parser[String] =
              (ExpandedArrayItemCharacter(b)+) ^^ {  (_).mkString }
+
   def ExpandedArrayItemCharacter(b: String): Parser[String] =
              NonEscapedArrayItemCharacter(b) |
              not(regex("""\$|@|\{""".r)) ~ regex("""#""".r) ^^ { case n~r => r } |
              ExpandedArrayEscapeSequence | InterpolatedCharacterSequence
+
   def NonEscapedArrayItemCharacter(b: String): Parser[String] =
              not(QuotedArrayItemSeparator | regex("""\\|#""".r)) ~ SourceCharacter ^? {
                                case n~s if (b=="(" || b=="{" || b=="[" || b=="<" || b!=s) => s }
