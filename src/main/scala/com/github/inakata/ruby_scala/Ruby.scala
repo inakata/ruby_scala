@@ -1485,27 +1485,31 @@ class Ruby extends RegexParsers with PackratParsers with TracableParsers {
 
   lazy val ArrayLiteral: Parser[String] = QuotedNonExpandedArrayConstructor | QuotedExpandedArrayConstructor
 
-  lazy val QuotedNonExpandedArrayConstructor: Parser[String] = regex("""%w""".r) ~ ( LiteralBeginningDelimiter >> { case literalBegin =>
-    (NonExpandedArrayContent(literalBegin) >> { case content =>
-      Parser{next => Success(content.split(" ").mkString("__"), next)}
-    }) ~ LiteralEndingDelimiter2(literalBegin) ^^ {  case a~e => "'" + literalBegin + "'" + a+ "'" + e + "'" }
-  } ) ^^ { case r~s => s"|${r}|" + s }
-
-  def NonExpandedArrayContent(literalBegin: String): Parser[String] =
-    ??(QuotedArrayItemSeparatorList) ~ ??(NonExpandedArrayItemList(literalBegin)) ~ ??(QuotedArrayItemSeparatorList) ^^ { case s1~a~s2 => s1+a+s2 }
-
-  def NonExpandedArrayItemList(literalBegin: String): Parser[String] =
-    rep1sep(NonExpandedArrayItem(literalBegin),  QuotedArrayItemSeparatorList) ^^ { _.mkString("", ", ", "") }
-
-  lazy val QuotedArrayItemSeparatorList: Parser[String] = (QuotedArrayItemSeparator+) ^^ {  (_).mkString }
+  lazy val QuotedArrayItemSeparatorList: Parser[String] = (QuotedArrayItemSeparator+) ^^ {_.mkString }
 
   lazy val QuotedArrayItemSeparator: Parser[String] = Whitespace | LineTerminator
 
-  def NonExpandedArrayItem(literalBegin: String): Parser[String] = (NonExpandedArrayItemCharacter(literalBegin)+) ^^ {  (_).mkString }
+  lazy val QuotedNonExpandedArrayConstructor: Parser[String] = regex("""%w""".r) ~ (
+    LiteralBeginningDelimiter >> { case literalBegin =>
+      (NonExpandedArrayContent(literalBegin) >> { case content =>
+        println(s"content: ${content}")
+        Parser{next => Success(content.split(" ").mkString("__"), next)}
+      }) ~ LiteralEndingDelimiter2(literalBegin) ^^ {  case a~e => "'" + literalBegin + "'" + a+ "'" + e + "'" }
+    }
+    ) ^^ { case r~s => s"|${r}|" + s }
+
+  def NonExpandedArrayContent(literalBegin: String): Parser[String] = (??(QuotedArrayItemSeparatorList) ~> NonExpandedArrayItemList(literalBegin).+ <~ ??(QuotedArrayItemSeparatorList) ) ^^ {_.flatten.mkString}
+
+  def NonExpandedArrayItemList(literalBegin: String): Parser[String] = rep1sep(
+    NonExpandedArrayItem(literalBegin)  |  (LiteralBeginningDelimiter2(literalBegin) ~ NonExpandedArrayItemList(literalBegin) ~ LiteralEndingDelimiter2(literalBegin)) ^^ { case a1 ~ a2 ~ a3 => a1 + a2 + a3 },
+    QuotedArrayItemSeparatorList
+  ) ^^ {_.mkString(" ")}
+
+  def NonExpandedArrayItem(literalBegin: String): Parser[String] = NonExpandedArrayItemCharacter(literalBegin).+ ^^ {_.mkString}
 
   def NonExpandedArrayItemCharacter(literalBegin: String): Parser[String] = NonEscapedArrayCharacter(literalBegin) | NonExpandedArrayEscapeSequence(literalBegin)
 
-  def NonEscapedArrayCharacter(literalBegin: String): Parser[String] = not(QuotedArrayItemSeparator) ~ NonEscapedLiteralCharacter(literalBegin) ^^ { case n~s => s }
+  def NonEscapedArrayCharacter(literalBegin: String): Parser[String] = not(QuotedArrayItemSeparator) ~ NonExpandedLiteralCharacter(literalBegin)^^ { case n~s => s }
 
   def NonExpandedArrayEscapeSequence(literalBegin: String): Parser[String] = NonExpandedLiteralEscapeSequence(literalBegin) | regex("""\\""".r) ~ QuotedArrayItemSeparator  ^^ { case r~s => r+s }
 
